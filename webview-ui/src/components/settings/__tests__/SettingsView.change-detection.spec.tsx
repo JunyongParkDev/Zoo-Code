@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from "@testing-library/react"
+import { act, render, screen, fireEvent, waitFor } from "@testing-library/react"
 import { vi, describe, it, expect, beforeEach } from "vitest"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import React from "react"
@@ -449,6 +449,12 @@ describe("SettingsView - Change Detection Fix", () => {
 			</QueryClientProvider>,
 		)
 
+		// Let the import cache-busting effect run. With the old implementation,
+		// this would reset cachedState back to the replayed Baseten config.
+		await act(async () => {
+			await new Promise((resolve) => setTimeout(resolve, 0))
+		})
+
 		expect(screen.getByTestId("provider-value")).toHaveTextContent("deepseek")
 
 		mockPostMessage.mockClear()
@@ -460,6 +466,55 @@ describe("SettingsView - Change Detection Fix", () => {
 			apiConfiguration: expect.objectContaining({
 				apiProvider: "deepseek",
 			}),
+		})
+	})
+
+	it("resets cached provider state when a new import timestamp arrives", async () => {
+		const onDone = vi.fn()
+		let extensionState = createExtensionState({
+			settingsImportedAt: 100,
+			apiConfiguration: {
+				apiProvider: "openai",
+				apiModelId: "gpt-4.1",
+			},
+		})
+
+		;(useExtensionState as any).mockImplementation(() => extensionState)
+
+		const { rerender } = render(
+			<QueryClientProvider client={queryClient}>
+				<SettingsView onDone={onDone} />
+			</QueryClientProvider>,
+		)
+
+		await waitFor(() => {
+			expect(screen.getByTestId("provider-value")).toHaveTextContent("openai")
+		})
+
+		fireEvent.click(screen.getByTestId("set-provider-deepseek"))
+		expect(screen.getByTestId("provider-value")).toHaveTextContent("deepseek")
+
+		extensionState = createExtensionState({
+			settingsImportedAt: 101,
+			apiConfiguration: {
+				apiProvider: "baseten",
+				apiModelId: "zai-org/GLM-4.6",
+				basetenApiKey: "imported-baseten-key",
+			},
+		})
+
+		rerender(
+			<QueryClientProvider client={queryClient}>
+				<SettingsView onDone={onDone} />
+			</QueryClientProvider>,
+		)
+
+		await waitFor(() => {
+			expect(screen.getByTestId("provider-value")).toHaveTextContent("baseten")
+		})
+
+		await waitFor(() => {
+			expect(screen.getByTestId("save-button")).toBeDisabled()
 		})
 	})
 })
