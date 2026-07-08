@@ -629,13 +629,13 @@ describe("SettingsView - Allowed Commands", () => {
 		// Verify command was added
 		expect(within(content).getByText("npm test")).toBeInTheDocument()
 
-		// Verify VSCode message was sent
-		expect(vscode.postMessage).toHaveBeenCalledWith({
-			type: "updateSettings",
-			updatedSettings: {
-				allowedCommands: ["npm test"],
-			},
-		})
+		// Adding a command must NOT persist before Save; it only buffers in cachedState.
+		expect(vscode.postMessage).not.toHaveBeenCalledWith(
+			expect.objectContaining({
+				type: "updateSettings",
+				updatedSettings: expect.objectContaining({ allowedCommands: ["npm test"] }),
+			}),
+		)
 	})
 
 	it("removes command from the list", () => {
@@ -663,13 +663,13 @@ describe("SettingsView - Allowed Commands", () => {
 		// Verify command was removed
 		expect(within(content).queryByText("npm test")).not.toBeInTheDocument()
 
-		// Verify VSCode message was sent
-		expect(vscode.postMessage).toHaveBeenLastCalledWith({
-			type: "updateSettings",
-			updatedSettings: {
-				allowedCommands: [],
-			},
-		})
+		// Removing a command must NOT persist before Save; it only buffers in cachedState.
+		expect(vscode.postMessage).not.toHaveBeenCalledWith(
+			expect.objectContaining({
+				type: "updateSettings",
+				updatedSettings: expect.objectContaining({ allowedCommands: expect.anything() }),
+			}),
+		)
 	})
 
 	describe("SettingsView - Tab Navigation", () => {
@@ -773,6 +773,41 @@ describe("SettingsView - Duplicate Commands", () => {
 				updatedSettings: expect.objectContaining({
 					allowedCommands: ["npm test"],
 				}),
+			}),
+		)
+	})
+
+	it("does not persist allowed commands when discarding unsaved changes", () => {
+		// Render once and get the activateTab helper
+		const { activateTab, getSettingsContent } = renderSettingsView()
+
+		// Activate the autoApprove tab
+		activateTab("autoApprove")
+
+		const content = getSettingsContent()
+		// Enable always allow execute
+		const executeCheckbox = within(content).getByTestId("always-allow-execute-toggle")
+		fireEvent.click(executeCheckbox)
+
+		// Add a command (buffers into cachedState, must not persist yet)
+		const input = within(content).getByTestId("command-input")
+		fireEvent.change(input, { target: { value: "npm test" } })
+		const addButton = within(content).getByTestId("add-command-button")
+		fireEvent.click(addButton)
+
+		// Click Done, which opens the unsaved-changes dialog since a change is detected
+		const doneButton = screen.getByText("settings:common.done")
+		fireEvent.click(doneButton)
+
+		// Confirm discard
+		const discardButton = screen.getByTestId("alert-dialog-action")
+		fireEvent.click(discardButton)
+
+		// Discarding must never persist the buffered command edit
+		expect(vscode.postMessage).not.toHaveBeenCalledWith(
+			expect.objectContaining({
+				type: "updateSettings",
+				updatedSettings: expect.objectContaining({ allowedCommands: ["npm test"] }),
 			}),
 		)
 	})

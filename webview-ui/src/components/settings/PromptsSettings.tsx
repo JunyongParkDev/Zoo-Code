@@ -208,11 +208,6 @@ const PromptsSettings = ({
 										}
 
 										setIncludeTaskHistoryInEnhance(target.checked)
-
-										vscode.postMessage({
-											type: "updateSettings",
-											updatedSettings: { includeTaskHistoryInEnhance: target.checked },
-										})
 									}}>
 									<span className="font-medium">
 										{t("prompts:supportPrompts.enhance.includeTaskHistory")}
