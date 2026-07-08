@@ -1,12 +1,14 @@
 import { FormEvent } from "react"
 import { VSCodeCheckbox } from "@vscode/webview-ui-toolkit/react"
 
-import { useExtensionState } from "@src/context/ExtensionStateContext"
 import { useAppTranslation } from "@src/i18n/TranslationContext"
-import { vscode } from "@src/utils/vscode"
 
-const McpEnabledToggle = () => {
-	const { mcpEnabled, setMcpEnabled } = useExtensionState()
+type McpEnabledToggleProps = {
+	mcpEnabled?: boolean
+	onMcpEnabledChange: (value: boolean) => void
+}
+
+const McpEnabledToggle = ({ mcpEnabled, onMcpEnabledChange }: McpEnabledToggleProps) => {
 	const { t } = useAppTranslation()
 
 	const handleChange = (e: Event | FormEvent<HTMLElement>) => {
@@ -16,13 +18,12 @@ const McpEnabledToggle = () => {
 			return
 		}
 
-		setMcpEnabled(target.checked)
-		vscode.postMessage({ type: "updateSettings", updatedSettings: { mcpEnabled: target.checked } })
+		onMcpEnabledChange(target.checked)
 	}
 
 	return (
 		<div style={{ marginBottom: "20px" }}>
-			<VSCodeCheckbox checked={mcpEnabled} onChange={handleChange}>
+			<VSCodeCheckbox checked={mcpEnabled ?? true} onChange={handleChange}>
 				<span style={{ fontWeight: "500" }}>{t("mcp:enableToggle.title")}</span>
 			</VSCodeCheckbox>
 			<p

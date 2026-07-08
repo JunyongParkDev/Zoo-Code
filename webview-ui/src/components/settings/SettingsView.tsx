@@ -900,7 +900,12 @@ const SettingsView = forwardRef<SettingsViewRef, SettingsViewProps>(({ onDone, t
 						{renderTab === "modes" && <ModesView />}
 
 						{/* MCP Section */}
-						{renderTab === "mcp" && <McpView />}
+						{renderTab === "mcp" && (
+							<McpView
+								mcpEnabled={mcpEnabled}
+								onMcpEnabledChange={(value) => setCachedStateField("mcpEnabled", value)}
+							/>
+						)}
 
 						{/* Worktrees Section */}
 						{renderTab === "worktrees" && <WorktreesView />}

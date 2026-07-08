@@ -325,6 +325,23 @@ const renderSettingsView = (initialState: any = {}) => {
 	return { onDone, activateTab, getSettingsContent }
 }
 
+const getUpdateSettingsMessages = () =>
+	vi
+		.mocked(vscode.postMessage)
+		.mock.calls.map(([message]) => message)
+		.filter((message) => message?.type === "updateSettings")
+
+const getCheckboxNearText = (container: HTMLElement, text: string) => {
+	const label = within(container).getByText(text).closest("label")
+	const checkbox = label?.querySelector('input[type="checkbox"]')
+
+	if (!checkbox) {
+		throw new Error(`Checkbox not found for ${text}`)
+	}
+
+	return checkbox as HTMLInputElement
+}
+
 describe("SettingsView - Sound Settings", () => {
 	beforeEach(() => {
 		vi.clearAllMocks()
@@ -629,13 +646,14 @@ describe("SettingsView - Allowed Commands", () => {
 		// Verify command was added
 		expect(within(content).getByText("npm test")).toBeInTheDocument()
 
-		// Verify VSCode message was sent
-		expect(vscode.postMessage).toHaveBeenCalledWith({
-			type: "updateSettings",
-			updatedSettings: {
-				allowedCommands: ["npm test"],
-			},
-		})
+		// Save-managed settings should stay local until the user clicks Save.
+		expect(getUpdateSettingsMessages()).not.toContainEqual(
+			expect.objectContaining({
+				updatedSettings: expect.objectContaining({
+					allowedCommands: ["npm test"],
+				}),
+			}),
+		)
 	})
 
 	it("removes command from the list", () => {
@@ -663,13 +681,14 @@ describe("SettingsView - Allowed Commands", () => {
 		// Verify command was removed
 		expect(within(content).queryByText("npm test")).not.toBeInTheDocument()
 
-		// Verify VSCode message was sent
-		expect(vscode.postMessage).toHaveBeenLastCalledWith({
-			type: "updateSettings",
-			updatedSettings: {
-				allowedCommands: [],
-			},
-		})
+		// Save-managed settings should stay local until the user clicks Save.
+		expect(getUpdateSettingsMessages()).not.toContainEqual(
+			expect.objectContaining({
+				updatedSettings: expect.objectContaining({
+					allowedCommands: [],
+				}),
+			}),
+		)
 	})
 
 	describe("SettingsView - Tab Navigation", () => {
@@ -772,6 +791,75 @@ describe("SettingsView - Duplicate Commands", () => {
 				type: "updateSettings",
 				updatedSettings: expect.objectContaining({
 					allowedCommands: ["npm test"],
+				}),
+			}),
+		)
+	})
+})
+
+describe("SettingsView - Save-managed settings", () => {
+	beforeEach(() => {
+		vi.clearAllMocks()
+	})
+
+	it("keeps MCP enabled changes local until Save", () => {
+		const { activateTab, getSettingsContent } = renderSettingsView({
+			mcpEnabled: false,
+			mcpServers: [],
+		})
+
+		activateTab("mcp")
+
+		const content = getSettingsContent()
+		const mcpEnabledCheckbox = getCheckboxNearText(content, "mcp:enableToggle.title")
+		fireEvent.change(mcpEnabledCheckbox, { target: { checked: true } })
+
+		expect(getUpdateSettingsMessages()).not.toContainEqual(
+			expect.objectContaining({
+				updatedSettings: expect.objectContaining({
+					mcpEnabled: true,
+				}),
+			}),
+		)
+
+		fireEvent.click(screen.getByTestId("save-button"))
+
+		expect(getUpdateSettingsMessages()).toContainEqual(
+			expect.objectContaining({
+				updatedSettings: expect.objectContaining({
+					mcpEnabled: true,
+				}),
+			}),
+		)
+	})
+
+	it("keeps prompt enhancement history changes local until Save", async () => {
+		const { activateTab, getSettingsContent } = renderSettingsView({
+			includeTaskHistoryInEnhance: true,
+			listApiConfigMeta: [],
+		})
+
+		activateTab("prompts")
+
+		const content = getSettingsContent()
+		const includeHistoryCheckbox = getCheckboxNearText(content, "prompts:supportPrompts.enhance.includeTaskHistory")
+		fireEvent.click(includeHistoryCheckbox)
+		await waitFor(() => expect(includeHistoryCheckbox).not.toBeChecked())
+
+		expect(getUpdateSettingsMessages()).not.toContainEqual(
+			expect.objectContaining({
+				updatedSettings: expect.objectContaining({
+					includeTaskHistoryInEnhance: false,
+				}),
+			}),
+		)
+
+		fireEvent.click(screen.getByTestId("save-button"))
+
+		expect(getUpdateSettingsMessages()).toContainEqual(
+			expect.objectContaining({
+				updatedSettings: expect.objectContaining({
+					includeTaskHistoryInEnhance: false,
 				}),
 			}),
 		)

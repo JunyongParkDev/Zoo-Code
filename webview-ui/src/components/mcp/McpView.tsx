@@ -28,11 +28,18 @@ import McpResourceRow from "./McpResourceRow"
 import McpEnabledToggle from "./McpEnabledToggle"
 import { McpErrorRow } from "./McpErrorRow"
 
-const McpView = () => {
-	const { mcpServers: servers, alwaysAllowMcp, mcpEnabled } = useExtensionState()
+type McpViewProps = {
+	mcpEnabled?: boolean
+	onMcpEnabledChange?: (value: boolean) => void
+}
+
+const McpView = ({ mcpEnabled: cachedMcpEnabled, onMcpEnabledChange }: McpViewProps = {}) => {
+	const { mcpServers: servers, alwaysAllowMcp, mcpEnabled: liveMcpEnabled, setMcpEnabled } = useExtensionState()
 
 	const { t } = useAppTranslation()
 	const { isOverThreshold, title, message } = useTooManyTools()
+	const mcpEnabled = cachedMcpEnabled ?? liveMcpEnabled
+	const handleMcpEnabledChange = onMcpEnabledChange ?? setMcpEnabled
 
 	return (
 		<div>
@@ -55,7 +62,7 @@ const McpView = () => {
 					</Trans>
 				</div>
 
-				<McpEnabledToggle />
+				<McpEnabledToggle mcpEnabled={mcpEnabled} onMcpEnabledChange={handleMcpEnabledChange} />
 
 				{mcpEnabled && (
 					<>
