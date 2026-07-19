@@ -777,9 +777,9 @@ describe("SettingsView - Duplicate Commands", () => {
 		)
 	})
 
-	it("does not persist allowed commands when discarding unsaved changes", () => {
+	it("reverts and does not persist allowed commands when discarding unsaved changes", () => {
 		// Render once and get the activateTab helper
-		const { activateTab, getSettingsContent } = renderSettingsView()
+		const { onDone, activateTab, getSettingsContent } = renderSettingsView()
 
 		// Activate the autoApprove tab
 		activateTab("autoApprove")
@@ -794,6 +794,9 @@ describe("SettingsView - Duplicate Commands", () => {
 		fireEvent.change(input, { target: { value: "npm test" } })
 		const addButton = within(content).getByTestId("add-command-button")
 		fireEvent.click(addButton)
+
+		// Verify the command was buffered and rendered before discarding it
+		expect(within(content).getByText("npm test")).toBeInTheDocument()
 
 		// Click Done, which opens the unsaved-changes dialog since a change is detected
 		const doneButton = screen.getByText("settings:common.done")
@@ -810,5 +813,9 @@ describe("SettingsView - Duplicate Commands", () => {
 				updatedSettings: expect.objectContaining({ allowedCommands: ["npm test"] }),
 			}),
 		)
+
+		// The buffered edit must be reverted before leaving Settings
+		expect(within(getSettingsContent()).queryByText("npm test")).not.toBeInTheDocument()
+		expect(onDone).toHaveBeenCalledTimes(1)
 	})
 })
