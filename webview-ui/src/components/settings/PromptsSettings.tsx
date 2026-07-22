@@ -208,6 +208,17 @@ const PromptsSettings = ({
 										}
 
 										setIncludeTaskHistoryInEnhance(target.checked)
+
+										// Controlled: setter buffers into cachedState (Save persists).
+										// Uncontrolled: context setter is local-only, so persist here.
+										if (!propsSetIncludeTaskHistoryInEnhance) {
+											vscode.postMessage({
+												type: "updateSettings",
+												updatedSettings: {
+													includeTaskHistoryInEnhance: target.checked,
+												},
+											})
+										}
 									}}>
 									<span className="font-medium">
 										{t("prompts:supportPrompts.enhance.includeTaskHistory")}

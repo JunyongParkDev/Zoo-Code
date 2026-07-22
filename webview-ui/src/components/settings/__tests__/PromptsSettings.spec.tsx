@@ -15,15 +15,19 @@ vi.mock("@src/i18n/TranslationContext", () => ({
 	useAppTranslation: () => ({ t: (key: string) => key }),
 }))
 
-// PromptsSettings falls back to context when props are absent; we always pass
-// props here (the SettingsView wiring), so the context values are inert.
+// Exposed so tests can assert the context (uncontrolled) setter still fires.
+const { contextSetIncludeTaskHistoryInEnhance } = vi.hoisted(() => ({
+	contextSetIncludeTaskHistoryInEnhance: vi.fn(),
+}))
+
+// PromptsSettings falls back to context when props are absent.
 vi.mock("@src/context/ExtensionStateContext", () => ({
 	useExtensionState: () => ({
 		listApiConfigMeta: [],
 		enhancementApiConfigId: "",
 		setEnhancementApiConfigId: vi.fn(),
 		includeTaskHistoryInEnhance: true,
-		setIncludeTaskHistoryInEnhance: vi.fn(),
+		setIncludeTaskHistoryInEnhance: contextSetIncludeTaskHistoryInEnhance,
 	}),
 }))
 
@@ -58,5 +62,30 @@ describe("PromptsSettings - Save/Discard contract", () => {
 
 		expect(setIncludeTaskHistoryInEnhance).toHaveBeenCalledWith(false)
 		expect(vscode.postMessage).not.toHaveBeenCalledWith(expect.objectContaining({ type: "updateSettings" }))
+	})
+
+	// Uncontrolled usage (props omitted) has no cachedState/Save wiring, so the
+	// toggle must persist immediately via updateSettings — otherwise it is lost.
+	it("persists includeTaskHistoryInEnhance immediately when used uncontrolled", () => {
+		render(
+			<PromptsSettings
+				customSupportPrompts={{}}
+				setCustomSupportPrompts={vi.fn()}
+				// includeTaskHistoryInEnhance / setIncludeTaskHistoryInEnhance omitted → context fallback
+			/>,
+		)
+
+		const checkbox = screen
+			.getByText("prompts:supportPrompts.enhance.includeTaskHistory")
+			.closest("label")!
+			.querySelector('input[type="checkbox"]')!
+		fireEvent.click(checkbox)
+
+		// Still updates local (context) state, and also persists immediately.
+		expect(contextSetIncludeTaskHistoryInEnhance).toHaveBeenCalledWith(false)
+		expect(vscode.postMessage).toHaveBeenCalledWith({
+			type: "updateSettings",
+			updatedSettings: { includeTaskHistoryInEnhance: false },
+		})
 	})
 })
