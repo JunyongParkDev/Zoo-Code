@@ -1986,6 +1986,49 @@ describe("Cline", () => {
 			expect(messageListener).toHaveBeenCalledWith({ action: "created", message })
 		})
 
+		it("continues the message lifecycle when throttled state scheduling and flushing fail", async () => {
+			const task = new Task({
+				provider: mockProvider,
+				apiConfiguration: mockApiConfig,
+				task: "test task",
+				startTask: false,
+			})
+			const taskAccess = getTaskTestAccess(task)
+			const postError = new Error("state schedule failed")
+			const flushError = new Error("state flush failed")
+			const postSpy = vi.mocked(mockProvider.postStateToWebviewThrottled).mockRejectedValueOnce(postError)
+			const flushSpy = vi.mocked(mockProvider.flushPostStateToWebviewThrottled).mockRejectedValueOnce(flushError)
+			const saveSpy = vi.spyOn(taskAccess, "saveClineMessages").mockResolvedValue(true)
+			const messageListener = vi.fn()
+			const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {})
+			task.on(RooCodeEventName.Message, messageListener)
+			const message = {
+				ts: 1,
+				type: "ask" as const,
+				ask: "resume_task" as const,
+			}
+
+			await expect(taskAccess.addToClineMessages(message)).resolves.toBeUndefined()
+
+			expect(consoleErrorSpy).toHaveBeenCalledWith(
+				"[Task#addToClineMessages] postStateToWebviewThrottled failed:",
+				postError,
+			)
+			expect(consoleErrorSpy).toHaveBeenCalledWith(
+				"[Task#addToClineMessages] flushPostStateToWebviewThrottled failed:",
+				flushError,
+			)
+			expect(postSpy).toHaveBeenCalledOnce()
+			expect(flushSpy).toHaveBeenCalledOnce()
+			expect(messageListener).toHaveBeenCalledWith({ action: "created", message })
+			expect(saveSpy).toHaveBeenCalledOnce()
+			expect(postSpy.mock.invocationCallOrder[0]).toBeLessThan(flushSpy.mock.invocationCallOrder[0])
+			expect(flushSpy.mock.invocationCallOrder[0]).toBeLessThan(messageListener.mock.invocationCallOrder[0])
+			expect(messageListener.mock.invocationCallOrder[0]).toBeLessThan(saveSpy.mock.invocationCallOrder[0])
+
+			consoleErrorSpy.mockRestore()
+		})
+
 		it("keeps an already answered ask on the throttled path", async () => {
 			const task = new Task({
 				provider: mockProvider,
@@ -2128,6 +2171,38 @@ describe("Cline", () => {
 			expect(emitSpy.mock.invocationCallOrder[taskAbortedCallIndex]).toBeLessThan(
 				disposeSpy.mock.invocationCallOrder[0],
 			)
+		})
+
+		it("continues abort cleanup when flushing pending state fails", async () => {
+			const task = new Task({
+				provider: mockProvider,
+				apiConfiguration: mockApiConfig,
+				task: "test task",
+				startTask: false,
+			})
+			const error = new Error("state flush failed")
+			const flushSpy = vi.mocked(mockProvider.flushPostStateToWebviewThrottled).mockRejectedValueOnce(error)
+			const taskAbortedListener = vi.fn()
+			const disposeSpy = vi.spyOn(task, "dispose").mockImplementation(() => {})
+			const saveSpy = vi.spyOn(getTaskTestAccess(task), "saveClineMessages").mockResolvedValue(true)
+			const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {})
+			task.on(RooCodeEventName.TaskAborted, taskAbortedListener)
+
+			await expect(task.abortTask()).resolves.toBeUndefined()
+
+			expect(consoleErrorSpy).toHaveBeenCalledWith(
+				`[Task#abortTask] flushPostStateToWebviewThrottled failed for ${task.taskId}.${task.instanceId}:`,
+				error,
+			)
+			expect(task.abort).toBe(true)
+			expect(flushSpy).toHaveBeenCalledOnce()
+			expect(taskAbortedListener).toHaveBeenCalledOnce()
+			expect(disposeSpy).toHaveBeenCalledOnce()
+			expect(saveSpy).toHaveBeenCalledOnce()
+			expect(flushSpy.mock.invocationCallOrder[0]).toBeLessThan(taskAbortedListener.mock.invocationCallOrder[0])
+			expect(taskAbortedListener.mock.invocationCallOrder[0]).toBeLessThan(disposeSpy.mock.invocationCallOrder[0])
+
+			consoleErrorSpy.mockRestore()
 		})
 
 		it("should work with TaskLike interface", async () => {

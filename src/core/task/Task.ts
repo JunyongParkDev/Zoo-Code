@@ -1037,9 +1037,17 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 		// Unanswered asks must reach the webview before Message listeners can respond against its state.
 		const requiresImmediateState =
 			message.partial === true || (message.type === "ask" && message.isAnswered !== true)
-		await provider?.postStateToWebviewThrottled()
+		try {
+			await provider?.postStateToWebviewThrottled()
+		} catch (error) {
+			console.error("[Task#addToClineMessages] postStateToWebviewThrottled failed:", error)
+		}
 		if (requiresImmediateState) {
-			await provider?.flushPostStateToWebviewThrottled()
+			try {
+				await provider?.flushPostStateToWebviewThrottled()
+			} catch (error) {
+				console.error("[Task#addToClineMessages] flushPostStateToWebviewThrottled failed:", error)
+			}
 		}
 		this.emit(RooCodeEventName.Message, { action: "created", message })
 		await this.saveClineMessages()
@@ -2251,7 +2259,14 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 		// Force final token usage update before abort event
 		this.emitFinalTokenUsageUpdate()
 
-		await this.providerRef.deref()?.flushPostStateToWebviewThrottled()
+		try {
+			await this.providerRef.deref()?.flushPostStateToWebviewThrottled()
+		} catch (error) {
+			console.error(
+				`[Task#abortTask] flushPostStateToWebviewThrottled failed for ${this.taskId}.${this.instanceId}:`,
+				error,
+			)
+		}
 
 		this.emit(RooCodeEventName.TaskAborted)
 

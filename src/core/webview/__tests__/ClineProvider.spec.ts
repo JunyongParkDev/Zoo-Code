@@ -907,6 +907,24 @@ describe("ClineProvider", () => {
 			)
 		})
 
+		test("handles state post failures while flushing a pending trailing post", async () => {
+			const error = new Error("state post failed")
+			const logSpy = vi.spyOn(provider, "log").mockImplementation(() => {})
+			const postStateSpy = vi
+				.spyOn(provider, "postStateToWebviewWithoutTaskHistory")
+				.mockResolvedValueOnce(undefined)
+				.mockRejectedValueOnce(error)
+
+			await provider.postStateToWebviewThrottled()
+			await provider.postStateToWebviewThrottled()
+			await expect(provider.flushPostStateToWebviewThrottled()).resolves.toBeUndefined()
+
+			expect(postStateSpy).toHaveBeenCalledTimes(2)
+			expect(logSpy).toHaveBeenCalledWith(
+				"[ClineProvider#postStateToWebviewThrottled] Failed to post state: state post failed",
+			)
+		})
+
 		test("cancels pending work on dispose and ignores later schedule or flush calls", async () => {
 			const postStateSpy = vi.spyOn(provider, "postStateToWebviewWithoutTaskHistory").mockResolvedValue(undefined)
 
