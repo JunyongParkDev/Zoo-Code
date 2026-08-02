@@ -2160,7 +2160,7 @@ describe("Cline", () => {
 			await task.abortTask()
 
 			const taskAbortedCallIndex = (emitSpy.mock.calls as unknown[][]).findIndex(
-				([event]) => event === "taskAborted",
+				([event]) => event === RooCodeEventName.TaskAborted,
 			)
 			expect(taskAbortedCallIndex).toBeGreaterThanOrEqual(0)
 			expect(queuedMessagesAtFlush).toBe(1)

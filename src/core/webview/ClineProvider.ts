@@ -2310,6 +2310,12 @@ export class ClineProvider
 		await this.postMessageToWebview({ type: "state", state: rest })
 	}
 
+	/**
+	 * Schedules a debounced state-post attempt. A call made while the debounce timer is active returns
+	 * the result of the most recent invocation, so awaiting this method does not wait for the trailing
+	 * invocation scheduled by that call. Use `flushPostStateToWebviewThrottled()` to force and await any
+	 * pending trailing invocation before continuing.
+	 */
 	async postStateToWebviewThrottled(): Promise<void> {
 		if (this._disposed) {
 			return
