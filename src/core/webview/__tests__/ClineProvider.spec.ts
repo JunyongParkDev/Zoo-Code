@@ -820,6 +820,58 @@ describe("ClineProvider", () => {
 		expect(statePostSettled).toBe(true)
 	})
 
+	test.each([
+		[
+			"postStateToWebviewWithoutTaskHistory",
+			(currentProvider: ClineProvider) => currentProvider.postStateToWebviewWithoutTaskHistory(),
+		],
+		[
+			"postStateToWebviewWithoutClineMessages",
+			(currentProvider: ClineProvider) => currentProvider.postStateToWebviewWithoutClineMessages(),
+		],
+	])("%s skips task history computation", async (_methodName, postState) => {
+		const getAllSpy = vi.spyOn(provider.taskHistoryStore, "getAll")
+		const postMessageSpy = vi.spyOn(provider, "postMessageToWebview").mockResolvedValue(undefined)
+
+		await postState(provider)
+
+		expect(getAllSpy).not.toHaveBeenCalled()
+		expect(postMessageSpy).toHaveBeenCalledOnce()
+		expect(postMessageSpy.mock.calls[0]?.[0].state).not.toHaveProperty("taskHistory")
+	})
+
+	test("getStateToPostToWebview computes task history once after its base state resolves", async () => {
+		const historyItem = {
+			id: "history-task",
+			number: 1,
+			ts: 1,
+			task: "History task",
+			tokensIn: 0,
+			tokensOut: 0,
+			totalCost: 0,
+		}
+		const originalGetState = provider.getState.bind(provider)
+		let baseStateResolved = false
+		const getStateSpy = vi.spyOn(provider, "getState").mockImplementation(async (options) => {
+			const state = await originalGetState(options)
+			baseStateResolved = true
+			return state
+		})
+		const historyReadPhases: boolean[] = []
+		const getAllSpy = vi.spyOn(provider.taskHistoryStore, "getAll").mockImplementation(() => {
+			historyReadPhases.push(baseStateResolved)
+			return [historyItem]
+		})
+
+		const state = await provider.getStateToPostToWebview()
+
+		expect(getStateSpy).toHaveBeenCalledOnce()
+		expect(getStateSpy).toHaveBeenCalledWith({ includeTaskHistory: false })
+		expect(getAllSpy).toHaveBeenCalledOnce()
+		expect(historyReadPhases).toEqual([true])
+		expect(state.taskHistory).toEqual([historyItem])
+	})
+
 	describe("postStateToWebviewThrottled", () => {
 		beforeEach(() => {
 			vi.useFakeTimers()
