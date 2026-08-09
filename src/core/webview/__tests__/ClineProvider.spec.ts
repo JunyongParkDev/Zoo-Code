@@ -914,15 +914,33 @@ describe("ClineProvider", () => {
 			expect(postStateSpy).toHaveBeenCalledTimes(2)
 		})
 
-		test("flushes a pending trailing post exactly once", async () => {
-			const postStateSpy = vi.spyOn(provider, "postStateToWebviewWithoutTaskHistory").mockResolvedValue(undefined)
+		test("flushes a pending trailing post exactly once and waits for it", async () => {
+			let releasePost!: () => void
+			const pendingPost = new Promise<void>((resolve) => {
+				releasePost = resolve
+			})
+			const postStateSpy = vi
+				.spyOn(provider, "postStateToWebviewWithoutTaskHistory")
+				.mockResolvedValueOnce(undefined)
+				.mockReturnValueOnce(pendingPost)
 
 			await provider.postStateToWebviewThrottled()
 			await provider.postStateToWebviewThrottled()
 			expect(postStateSpy).toHaveBeenCalledTimes(1)
 
-			await provider.flushPostStateToWebviewThrottled()
+			let flushSettled = false
+			const flushPromise = provider.flushPostStateToWebviewThrottled()
+			void flushPromise.then(() => {
+				flushSettled = true
+			})
+			await Promise.resolve()
+
 			expect(postStateSpy).toHaveBeenCalledTimes(2)
+			expect(flushSettled).toBe(false)
+
+			releasePost()
+			await flushPromise
+			expect(flushSettled).toBe(true)
 
 			await vi.advanceTimersByTimeAsync(1000)
 			expect(postStateSpy).toHaveBeenCalledTimes(2)
