@@ -367,8 +367,7 @@ const dispatchExtensionMessage = async (data: Record<string, unknown>) => {
 const dispatchTaskState = async (id: string, taskTs: number, childIds: string[] = []) => {
 	await dispatchExtensionMessage({
 		type: "state",
-		state: {
-			version: "1.0.0",
+		state: makeExtensionState({
 			clineMessages: [
 				{
 					type: "say",
@@ -380,17 +379,15 @@ const dispatchTaskState = async (id: string, taskTs: number, childIds: string[] 
 			currentTaskId: id,
 			currentTaskItem: {
 				id,
+				number: 1,
 				ts: taskTs,
 				task: id,
+				tokensIn: 0,
+				tokensOut: 0,
+				totalCost: 0,
 				childIds,
 			},
-			taskHistory: [],
-			shouldShowAnnouncement: false,
-			allowedCommands: [],
-			alwaysAllowExecute: false,
-			cloudIsAuthenticated: false,
-			telemetrySetting: "enabled",
-		},
+		}),
 	})
 }
 
