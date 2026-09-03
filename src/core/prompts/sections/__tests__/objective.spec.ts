@@ -67,4 +67,18 @@ describe("getObjectiveSection", () => {
 		expect(objective).toContain("ask_followup_question tool")
 		expect(objective).toContain("use attempt_completion to present the result")
 	})
+
+	it("includes question guidance independently of completion guidance", () => {
+		const objective = getObjectiveSection({ availableToolNames: new Set(["ask_followup_question"]) })
+
+		expect(objective).toContain("ask_followup_question tool")
+		expect(objective).not.toContain("use attempt_completion to present the result")
+	})
+
+	it("includes completion guidance independently of question guidance", () => {
+		const objective = getObjectiveSection({ availableToolNames: new Set(["attempt_completion"]) })
+
+		expect(objective).not.toContain("ask_followup_question tool")
+		expect(objective).toContain("use attempt_completion to present the result")
+	})
 })

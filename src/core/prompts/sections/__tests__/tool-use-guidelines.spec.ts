@@ -53,4 +53,12 @@ describe("getToolUseGuidelinesSection", () => {
 			expect(guidelines).not.toContain("running a command like `ls`")
 		},
 	)
+
+	it("includes the list-files comparison when listing and command tools are available", () => {
+		const guidelines = getToolUseGuidelinesSection({
+			availableToolNames: new Set(["list_files", "execute_command"]),
+		})
+
+		expect(guidelines).toContain("running a command like `ls`")
+	})
 })

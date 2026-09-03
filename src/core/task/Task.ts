@@ -1731,7 +1731,10 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 		await this.flushPendingToolResultsToHistory()
 
 		await this.safeEnsureModelFetched()
-		const resolvedPromptTools = await this.resolvePromptTools()
+		const supportsAllowedFunctionNames = this.apiConfiguration?.apiProvider === providerIdentifiers.gemini
+		const resolvedPromptTools = await this.resolvePromptTools({
+			includeAllToolsWithRestrictions: supportsAllowedFunctionNames,
+		})
 		const systemPrompt = await this.getSystemPrompt(resolvedPromptTools)
 		const { state, mode, toolsResult } = resolvedPromptTools
 		const customCondensingPrompt = state.customSupportPrompts?.CONDENSE
@@ -4211,7 +4214,12 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 		// Send condenseTaskContextStarted to show in-progress indicator
 		await this.providerRef.deref()?.postMessageToWebview({ type: "condenseTaskContextStarted", text: this.taskId })
 
-		const resolvedPromptTools = await this.resolvePromptTools({ state, mode })
+		const supportsAllowedFunctionNames = this.apiConfiguration?.apiProvider === providerIdentifiers.gemini
+		const resolvedPromptTools = await this.resolvePromptTools({
+			state,
+			mode,
+			includeAllToolsWithRestrictions: supportsAllowedFunctionNames,
+		})
 		const allTools = resolvedPromptTools.toolsResult.tools
 
 		// Build metadata with tools and taskId for the condensing API call

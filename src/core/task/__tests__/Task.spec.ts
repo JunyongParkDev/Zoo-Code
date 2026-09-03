@@ -665,6 +665,39 @@ describe("Cline", () => {
 			expect(vi.mocked(getEnvironmentDetails)).toHaveBeenCalledWith(task, true, promptToolNames)
 		})
 
+		it("keeps compatibility declarations separate from the Gemini condensing prompt policy", async () => {
+			const apiConfiguration = {
+				...mockApiConfig,
+				apiProvider: providerIdentifiers.gemini,
+			} as ProviderSettings
+			vi.spyOn(mockProvider, "getState").mockResolvedValue({
+				mode: "architect",
+				mcpEnabled: false,
+			} as unknown as ProviderState)
+			const task = new Task({
+				provider: mockProvider,
+				apiConfiguration,
+				task: "test task",
+				startTask: false,
+			})
+			await task.getTaskMode()
+			vi.mocked(SYSTEM_PROMPT).mockResolvedValueOnce("mock system prompt")
+
+			await task.condenseContext()
+
+			const [options] = requireDefined(vi.mocked(summarizeConversation).mock.calls.at(-1))
+			const promptToolNames = requireDefined(vi.mocked(SYSTEM_PROMPT).mock.calls.at(-1))[16]?.availableToolNames
+			const metadataToolNames = new Set(
+				(options.metadata?.tools ?? []).flatMap((tool) =>
+					"function" in tool && tool.function ? [tool.function.name] : [],
+				),
+			)
+
+			expect(promptToolNames?.has("execute_command")).toBe(false)
+			expect(metadataToolNames.has("execute_command")).toBe(true)
+			expect(options.metadata?.allowedFunctionNames).toBeUndefined()
+		})
+
 		it("uses the task mode in request metadata when focused provider state differs", async () => {
 			vi.spyOn(mockProvider, "getState").mockResolvedValue({
 				mode: "ask",
@@ -3282,16 +3315,21 @@ describe("Cline", () => {
 			})
 
 			it("should propagate AbortController signal through attemptApiRequest context-window retry path", async () => {
+				const apiConfiguration = {
+					...mockApiConfig,
+					apiProvider: providerIdentifiers.gemini,
+				} as ProviderSettings
 				vi.spyOn(mockProvider, "getState").mockResolvedValue({
 					mode: "architect",
 					mcpEnabled: false,
 				} as unknown as ProviderState)
 				const task = new Task({
 					provider: mockProvider,
-					apiConfiguration: mockApiConfig,
+					apiConfiguration,
 					task: "test task",
 					startTask: false,
 				})
+				const resolvePromptToolsSpy = vi.spyOn(getTaskTestAccess(task), "resolvePromptTools")
 				await task.getTaskMode()
 
 				vi.spyOn(getTaskTestAccess(task), "getSystemPrompt").mockResolvedValue("mock system prompt")
@@ -3315,7 +3353,7 @@ describe("Cline", () => {
 				const providerState = await mockProvider.getState()
 				vi.spyOn(mockProvider, "getState").mockResolvedValue({
 					...providerState,
-					apiConfiguration: mockApiConfig,
+					apiConfiguration,
 					mode: "code",
 					autoCondenseContext: true,
 					autoCondenseContextPercent: 80,
@@ -3390,6 +3428,15 @@ describe("Cline", () => {
 				expect(options.metadata?.mode).toBe("architect")
 				expect(options.metadata?.abortSignal).toBeInstanceOf(AbortSignal)
 				expect(options.metadata?.abortSignal?.aborted).toBe(false)
+				const toolNames = (options.metadata?.tools ?? []).flatMap((tool) =>
+					"function" in tool && tool.function ? [tool.function.name] : [],
+				)
+				expect(toolNames).toContain("execute_command")
+				const compatibilityFlags = resolvePromptToolsSpy.mock.calls.map(
+					([resolveOptions]) => resolveOptions?.includeAllToolsWithRestrictions,
+				)
+				expect(compatibilityFlags.length).toBeGreaterThanOrEqual(3)
+				expect(compatibilityFlags.every((flag) => flag === true)).toBe(true)
 			})
 		})
 	})

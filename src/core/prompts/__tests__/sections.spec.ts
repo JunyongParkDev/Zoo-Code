@@ -115,12 +115,16 @@ describe("getCapabilitiesSection", () => {
 		const withoutMcpOperation = getCapabilitiesSection(cwd, mockMcpHub, undefined, {
 			availableToolNames: new Set(["read_file"]),
 		})
-		const withMcpOperation = getCapabilitiesSection(cwd, mockMcpHub, undefined, {
+		const withDynamicMcpTool = getCapabilitiesSection(cwd, mockMcpHub, undefined, {
 			availableToolNames: new Set(["read_file", "mcp--test-server--search"]),
+		})
+		const withMcpResource = getCapabilitiesSection(cwd, mockMcpHub, undefined, {
+			availableToolNames: new Set(["read_file", "access_mcp_resource"]),
 		})
 
 		expect(withoutMcpOperation).not.toContain("MCP servers")
-		expect(withMcpOperation).toContain("MCP servers")
+		expect(withDynamicMcpTool).toContain("MCP servers")
+		expect(withMcpResource).toContain("MCP servers")
 	})
 
 	it("describes command, listing, search, and unrestricted edit capabilities", () => {
@@ -259,6 +263,9 @@ describe("getRulesSection", () => {
 		const noToolsResult = getRulesSection(cwd, undefined, {
 			availableToolNames: new Set(),
 		})
+		const dynamicMcpResult = getRulesSection(cwd, undefined, {
+			availableToolNames: new Set(["mcp--test-server--search"]),
+		})
 
 		expect(fullResult).toContain("Before using the execute_command tool")
 		expect(fullResult).toContain("list_files tool to list the files")
@@ -268,6 +275,7 @@ describe("getRulesSection", () => {
 		expect(fullResult).toContain("VENDOR CONFIDENTIALITY")
 		expect(commandOnlyResult).not.toContain("ask_followup_question")
 		expect(restrictedResult).toContain('The active mode can only edit files matching "\\.md$".')
+		expect(dynamicMcpResult).toContain("MCP operations should be used one at a time")
 		expect(noToolsResult).not.toContain("Use the tools provided")
 		expect(noToolsResult).not.toContain("wait for the user's response after each tool use")
 	})

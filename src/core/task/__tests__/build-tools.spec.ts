@@ -172,6 +172,20 @@ describe("buildNativeToolsArrayWithRestrictions", () => {
 		expect(Array.from(result.effectiveToolNames).some((name) => name.startsWith("mcp--"))).toBe(false)
 	})
 
+	it("keeps MCP operations enabled when mcpEnabled is unset", async () => {
+		const result = await buildNativeToolsArrayWithRestrictions({
+			provider: createProvider(createMcpHub(true)),
+			cwd: "/test/path",
+			mode: "code",
+			customModes: undefined,
+			experiments: {},
+			apiConfiguration,
+		})
+
+		expect(result.effectiveToolNames.has("access_mcp_resource")).toBe(true)
+		expect(result.effectiveToolNames.has(buildMcpToolIdentity("test-server", "test-tool"))).toBe(true)
+	})
+
 	it("excludes dynamic MCP tools when use_mcp_tool is disabled", async () => {
 		const result = await buildNativeToolsArrayWithRestrictions({
 			provider: createProvider(createMcpHub(true)),
