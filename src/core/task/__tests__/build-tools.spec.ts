@@ -1,8 +1,9 @@
 import type * as vscode from "vscode"
 
-import { providerIdentifiers, type ProviderSettings } from "@roo-code/types"
+import { providerIdentifiers, type McpTool, type ProviderSettings } from "@roo-code/types"
 
 import type { McpHub } from "../../../services/mcp/McpHub"
+import { buildMcpToolIdentity, buildMcpToolName } from "../../../utils/mcp-name"
 import type { ClineProvider } from "../../webview/ClineProvider"
 import { buildNativeToolsArrayWithRestrictions } from "../build-tools"
 
@@ -20,7 +21,7 @@ const apiConfiguration: ProviderSettings = {
 	apiProvider: providerIdentifiers.anthropic,
 }
 
-function createMcpHub(withCapabilities: boolean): McpHub {
+function createMcpHub(withCapabilities: boolean, tools?: McpTool[]): McpHub {
 	return {
 		getServers: () =>
 			withCapabilities
@@ -28,7 +29,7 @@ function createMcpHub(withCapabilities: boolean): McpHub {
 						{
 							name: "test-server",
 							resources: [{ uri: "test://resource", name: "Test Resource" }],
-							tools: [
+							tools: tools ?? [
 								{
 									name: "test-tool",
 									description: "Test tool",
@@ -185,5 +186,29 @@ describe("buildNativeToolsArrayWithRestrictions", () => {
 
 		expect(result.effectiveToolNames.has("access_mcp_resource")).toBe(true)
 		expect(Array.from(result.effectiveToolNames).some((name) => name.startsWith("mcp--"))).toBe(false)
+	})
+
+	it("keeps untruncated identities distinct when provider aliases collide", async () => {
+		const sharedPrefix = "long-tool-prefix-".repeat(4)
+		const firstToolName = `${sharedPrefix}first`
+		const collidingToolName = `${sharedPrefix}second`
+		const mcpHub = createMcpHub(true, [
+			{ name: firstToolName, description: "First", enabledForPrompt: true },
+			{ name: collidingToolName, description: "Second", enabledForPrompt: true },
+		])
+
+		expect(buildMcpToolName("test-server", firstToolName)).toBe(buildMcpToolName("test-server", collidingToolName))
+
+		const result = await buildNativeToolsArrayWithRestrictions({
+			provider: createProvider(mcpHub),
+			cwd: "/test/path",
+			mode: "code",
+			customModes: undefined,
+			experiments: {},
+			apiConfiguration,
+		})
+
+		expect(result.effectiveToolNames.has(buildMcpToolIdentity("test-server", firstToolName))).toBe(true)
+		expect(result.effectiveToolNames.has(buildMcpToolIdentity("test-server", collidingToolName))).toBe(false)
 	})
 })
