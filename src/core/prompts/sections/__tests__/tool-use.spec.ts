@@ -28,4 +28,16 @@ describe("getSharedToolUseSection", () => {
 		expect(section).not.toContain("<actual_tool_name>")
 		expect(section).not.toContain("</actual_tool_name>")
 	})
+
+	it("omits tool-use instructions when no tools are available", () => {
+		const section = getSharedToolUseSection({ availableToolNames: new Set() })
+
+		expect(section).toBe("")
+	})
+
+	it("keeps tool-use instructions when a supplied context has an available tool", () => {
+		const section = getSharedToolUseSection({ availableToolNames: new Set(["read_file"]) })
+
+		expect(section).toContain("TOOL USE")
+	})
 })

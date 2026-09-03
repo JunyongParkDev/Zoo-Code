@@ -136,6 +136,11 @@ describe("mode-validator", () => {
 		})
 
 		describe("tool requirements", () => {
+			it("disables every non-required tool when requirements are false", () => {
+				expect(isToolAllowedForMode("read_file", codeMode, [], false)).toBe(false)
+				expect(isToolAllowedForMode("attempt_completion", codeMode, [], false)).toBe(true)
+			})
+
 			it("respects tool requirements when provided", () => {
 				const requirements = { apply_diff: false }
 				expect(isToolAllowedForMode("apply_diff", codeMode, [], requirements)).toBe(false)
@@ -160,13 +165,18 @@ describe("mode-validator", () => {
 				expect(isToolAllowedForMode("apply_diff", codeMode, [], requirements)).toBe(false)
 			})
 
-			it("prioritizes requirements over ALWAYS_AVAILABLE_TOOLS", () => {
-				// Tools in ALWAYS_AVAILABLE_TOOLS (switch_mode, new_task, etc.) should still
-				// be blockable via toolRequirements / disabledTools
-				const requirements = { switch_mode: false, new_task: false, attempt_completion: false }
+			it("keeps lifecycle tools available while allowing optional control tools to be disabled", () => {
+				const requirements = {
+					switch_mode: false,
+					new_task: false,
+					attempt_completion: false,
+					ask_followup_question: false,
+				}
 				expect(isToolAllowedForMode("switch_mode", codeMode, [], requirements)).toBe(false)
 				expect(isToolAllowedForMode("new_task", codeMode, [], requirements)).toBe(false)
-				expect(isToolAllowedForMode("attempt_completion", codeMode, [], requirements)).toBe(false)
+				expect(isToolAllowedForMode("attempt_completion", codeMode, [], requirements)).toBe(true)
+				expect(isToolAllowedForMode("ask_followup_question", codeMode, [], requirements)).toBe(true)
+				expect(isToolAllowedForMode("new_task", "orchestrator", [], requirements)).toBe(true)
 			})
 		})
 	})

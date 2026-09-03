@@ -45,6 +45,7 @@ import { ModeConfig } from "@roo-code/types"
 
 import { SYSTEM_PROMPT } from "../system"
 import { McpHub } from "../../../services/mcp/McpHub"
+import { SkillsManager } from "../../../services/skills/SkillsManager"
 import { defaultModeSlug, modes, Mode } from "../../../shared/modes"
 import "../../../utils/path"
 import { addCustomInstructions } from "../sections/custom-instructions"
@@ -191,6 +192,33 @@ const createMockMcpHub = (withServers: boolean = false): McpHub =>
 		isConnecting: false,
 		connections: [],
 	}) as unknown as McpHub
+
+const generatePromptWithTools = (
+	toolNames: string[],
+	mode: Mode = defaultModeSlug,
+	customModePrompts?: Parameters<typeof SYSTEM_PROMPT>[6],
+	customModes?: ModeConfig[],
+	skillsManager?: SkillsManager,
+) =>
+	SYSTEM_PROMPT(
+		mockContext,
+		"/test/path",
+		false,
+		undefined,
+		undefined,
+		mode,
+		customModePrompts,
+		customModes,
+		undefined,
+		{},
+		undefined,
+		undefined,
+		undefined,
+		undefined,
+		undefined,
+		skillsManager,
+		{ availableToolNames: new Set(toolNames) },
+	)
 
 describe("SYSTEM_PROMPT", () => {
 	let mockMcpHub: McpHub
@@ -575,6 +603,94 @@ describe("SYSTEM_PROMPT", () => {
 		expect(prompt).toContain("RULES")
 		expect(prompt).toContain("SYSTEM INFORMATION")
 		expect(prompt).toContain("OBJECTIVE")
+	})
+
+	it("should omit system-owned guidance for unavailable tools", async () => {
+		const prompt = await generatePromptWithTools(["read_file", "ask_followup_question", "attempt_completion"])
+
+		expect(prompt).toContain("read files")
+		expect(prompt).not.toContain("execute_command")
+		expect(prompt).not.toContain("list_files")
+		expect(prompt).not.toContain("write and edit files")
+	})
+
+	it("should include available skills only when the skill tool is available", async () => {
+		const skillsManager = Object.create(SkillsManager.prototype) as SkillsManager
+		vi.spyOn(skillsManager, "getSkillsForMode").mockReturnValue([
+			{
+				name: "test-skill",
+				description: "A test skill for prompt composition",
+				path: "/skills/test-skill/SKILL.md",
+				source: "global",
+			},
+		])
+
+		const withoutSkillTool = await generatePromptWithTools(
+			["read_file", "attempt_completion"],
+			defaultModeSlug,
+			undefined,
+			undefined,
+			skillsManager,
+		)
+		const withSkillTool = await generatePromptWithTools(
+			["read_file", "skill", "attempt_completion"],
+			defaultModeSlug,
+			undefined,
+			undefined,
+			skillsManager,
+		)
+
+		expect(withoutSkillTool).not.toContain("AVAILABLE SKILLS")
+		expect(withoutSkillTool).not.toContain("<name>test-skill</name>")
+		expect(withSkillTool).toContain("AVAILABLE SKILLS")
+		expect(withSkillTool).toContain("<name>test-skill</name>")
+	})
+
+	it("should fall back to the default mode configuration for an unknown mode", async () => {
+		const prompt = await generatePromptWithTools(["read_file"], "unknown-mode")
+
+		expect(prompt).toContain(modes[0].roleDefinition)
+		expect(prompt).toContain("read files")
+	})
+
+	it("should apply Architect tool availability and edit restrictions to built-in instructions", async () => {
+		const prompt = await generatePromptWithTools(
+			["read_file", "write_to_file", "ask_followup_question", "attempt_completion"],
+			"architect",
+		)
+
+		expect(prompt).toContain("write the plan to a markdown file")
+		expect(prompt).toContain('The active mode can only edit files matching "\\.md$" (Markdown files only)')
+		expect(prompt).not.toContain("update_todo_list")
+		expect(prompt).not.toContain("switch_mode")
+	})
+
+	it("should preserve user-authored references to unavailable tools", async () => {
+		const userInstruction = "Document why execute_command is disabled for this workflow."
+		const prompt = await generatePromptWithTools(
+			["read_file", "ask_followup_question", "attempt_completion"],
+			defaultModeSlug,
+			{
+				[defaultModeSlug]: { customInstructions: userInstruction },
+			},
+		)
+
+		expect(prompt).toContain(userInstruction)
+	})
+
+	it("should still gate stored built-in instructions when they equal the default", async () => {
+		const architectInstructions = modes.find((mode) => mode.slug === "architect")?.customInstructions
+		const prompt = await generatePromptWithTools(
+			["read_file", "ask_followup_question", "attempt_completion"],
+			"architect",
+			{
+				architect: { customInstructions: architectInstructions },
+			},
+		)
+
+		expect(prompt).toContain("present the plan directly in your response")
+		expect(prompt).not.toContain("update_todo_list")
+		expect(prompt).not.toContain("switch_mode")
 	})
 
 	describe("allowedMcpServers filtering in system prompt", () => {

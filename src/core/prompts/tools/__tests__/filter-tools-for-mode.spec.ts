@@ -2,7 +2,7 @@
 
 import type OpenAI from "openai"
 
-import { filterNativeToolsForMode } from "../filter-tools-for-mode"
+import { filterMcpToolsForMode, filterNativeToolsForMode } from "../filter-tools-for-mode"
 
 function makeTool(name: string): OpenAI.Chat.ChatCompletionTool {
 	return {
@@ -226,4 +226,77 @@ describe("filterNativeToolsForMode - access_mcp_resource allowlist", () => {
 			expect(resultNames).toContain("access_mcp_resource")
 		})
 	})
+})
+
+describe("filterMcpToolsForMode", () => {
+	it("drops MCP tools when the mode does not allow MCP", () => {
+		const result = filterMcpToolsForMode([makeTool("mcp--server--search")], "orchestrator", undefined, undefined)
+
+		expect(result).toEqual([])
+	})
+
+	it("drops MCP tools excluded by the model", () => {
+		const result = filterMcpToolsForMode(
+			[makeTool("mcp--server--allowed"), makeTool("mcp--server--excluded")],
+			"code",
+			undefined,
+			undefined,
+			{
+				modelInfo: {
+					contextWindow: 200_000,
+					supportsPromptCache: false,
+					excludedTools: ["mcp--server--excluded"],
+				},
+			},
+		)
+
+		expect(result.map((tool) => ("function" in tool ? tool.function?.name : undefined))).toEqual([
+			"mcp--server--allowed",
+		])
+	})
+
+	it("drops malformed and explicitly disabled MCP tools", () => {
+		// Provider input is validated at runtime, so exercise the guard with a tool
+		// that is deliberately missing the statically required function payload.
+		const malformedTool = { type: "function" } as OpenAI.Chat.ChatCompletionTool
+		const result = filterMcpToolsForMode(
+			[malformedTool, makeTool("mcp--server--allowed"), makeTool("mcp--server--blocked")],
+			"code",
+			undefined,
+			undefined,
+			{ disabledTools: ["mcp--server--blocked"] },
+		)
+
+		expect(result).toHaveLength(1)
+		expect("function" in result[0] ? result[0].function?.name : undefined).toBe("mcp--server--allowed")
+	})
+
+	const globallyDisabledMcpCases: [string, NonNullable<Parameters<typeof filterMcpToolsForMode>[4]>][] = [
+		["disabledTools", { disabledTools: ["use_mcp_tool"] }],
+		[
+			"modelInfo.excludedTools",
+			{
+				modelInfo: {
+					contextWindow: 200_000,
+					supportsPromptCache: false,
+					excludedTools: ["use_mcp_tool"],
+				},
+			},
+		],
+	]
+
+	it.each(globallyDisabledMcpCases)(
+		"drops all MCP tools when %s globally disables MCP tool use",
+		(_source, settings) => {
+			const result = filterMcpToolsForMode(
+				[makeTool("mcp--server--first"), makeTool("mcp--server--second")],
+				"code",
+				undefined,
+				undefined,
+				settings,
+			)
+
+			expect(result).toEqual([])
+		},
+	)
 })

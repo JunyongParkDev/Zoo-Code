@@ -33,6 +33,7 @@ import { webviewMessageHandler } from "../webviewMessageHandler"
 import { Terminal } from "../../../integrations/terminal/Terminal"
 import { MessageManager } from "../../message-manager"
 import { forceFullModelDetailsLoad, hasLoadedFullDetails } from "../../../api/providers/fetchers/lmstudio"
+import { buildNativeToolsArrayWithRestrictions } from "../../task/build-tools"
 
 // Mock setup must come before imports.
 vi.mock("../../prompts/sections/custom-instructions")
@@ -356,10 +357,19 @@ vi.mock("../../prompts/system", () => ({
 	codeMode: "code",
 }))
 
+vi.mock("../../task/build-tools", () => ({
+	buildNativeToolsArrayWithRestrictions: vi.fn().mockResolvedValue({
+		tools: [],
+		effectiveToolNames: new Set(["read_file", "execute_command"]),
+	}),
+}))
+
 vi.mock("../../../api", () => ({
 	buildApiHandler: vi.fn().mockReturnValue({
+		ensureModelFetched: vi.fn().mockResolvedValue(undefined),
 		getModel: vi.fn().mockReturnValue({
 			id: "claude-3-sonnet",
+			info: {},
 		}),
 	}),
 }))
@@ -2170,6 +2180,98 @@ describe("ClineProvider", () => {
 			await messageHandler({ type: "getSystemPrompt", mode: "code" })
 
 			expect(vscode.window.showErrorMessage).toHaveBeenCalledWith("errors.get_system_prompt")
+		})
+
+		test("uses the effective disabled-tool policy for preview guidance", async () => {
+			const providerState = await provider.getState()
+			vi.spyOn(provider, "getState").mockResolvedValue({
+				...providerState,
+				apiConfiguration: {
+					apiProvider: providerIdentifiers.openrouter,
+				},
+				mcpEnabled: false,
+				mode: "code",
+				disabledTools: ["execute_command"],
+				experiments: experimentDefault,
+			})
+			vi.mocked(buildNativeToolsArrayWithRestrictions).mockResolvedValueOnce({
+				tools: [],
+				effectiveToolNames: new Set(["read_file"]),
+			})
+			const { SYSTEM_PROMPT } = await import("../../prompts/system")
+			vi.mocked(SYSTEM_PROMPT).mockClear()
+
+			const handler = getMessageHandler()
+			await handler({ type: "getSystemPrompt", mode: "code" })
+
+			expect(buildNativeToolsArrayWithRestrictions).toHaveBeenCalledWith(
+				expect.objectContaining({
+					disabledTools: ["execute_command"],
+					mcpEnabled: false,
+					mode: "code",
+				}),
+			)
+			const systemPromptCall = vi.mocked(SYSTEM_PROMPT).mock.calls.at(-1)
+			const promptContext = systemPromptCall?.[16]
+			expect(promptContext?.availableToolNames.has("execute_command")).toBe(false)
+			expect(promptContext?.availableToolNames.has("read_file")).toBe(true)
+		})
+
+		test("uses cached model policy when full model metadata fetch fails", async () => {
+			const { buildApiHandler } = await import("../../../api")
+			const fallbackHandler = {
+				ensureModelFetched: vi.fn().mockRejectedValue(new Error("fetch failed")),
+				createMessage: vi.fn(),
+				countTokens: vi.fn(),
+				getModel: vi.fn().mockReturnValue({
+					id: "cached-model",
+					info: {
+						contextWindow: 128_000,
+						supportsPromptCache: false,
+						excludedTools: ["execute_command"],
+					},
+				}),
+			} as ReturnType<typeof buildApiHandler>
+			vi.mocked(buildApiHandler).mockReturnValueOnce(fallbackHandler)
+
+			const providerState = await provider.getState()
+			vi.spyOn(provider, "getState").mockResolvedValue({
+				...providerState,
+				apiConfiguration: { apiProvider: providerIdentifiers.openrouter },
+				mcpEnabled: false,
+				mode: "code",
+				experiments: experimentDefault,
+			})
+
+			const handler = getMessageHandler()
+			await handler({ type: "getSystemPrompt", mode: "code" })
+
+			expect(buildNativeToolsArrayWithRestrictions).toHaveBeenCalledWith(
+				expect.objectContaining({
+					modelInfo: expect.objectContaining({ excludedTools: ["execute_command"] }),
+				}),
+			)
+		})
+
+		test("generates a preview when the temporary API handler cannot be created", async () => {
+			const { buildApiHandler } = await import("../../../api")
+			const error = new Error("handler creation failed")
+			vi.mocked(buildApiHandler).mockImplementationOnce(() => {
+				throw error
+			})
+			const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined)
+
+			const handler = getMessageHandler()
+			await handler({ type: "getSystemPrompt", mode: "code" })
+
+			expect(errorSpy).toHaveBeenCalledWith("Error reading model info for system prompt preview:", error)
+			expect(buildNativeToolsArrayWithRestrictions).toHaveBeenCalledWith(
+				expect.objectContaining({ modelInfo: undefined }),
+			)
+			expect(mockPostMessage).toHaveBeenCalledWith(
+				expect.objectContaining({ type: "systemPrompt", text: "mocked system prompt" }),
+			)
+			errorSpy.mockRestore()
 		})
 
 		test("uses code mode custom instructions", async () => {
