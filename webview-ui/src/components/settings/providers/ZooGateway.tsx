@@ -114,6 +114,7 @@ export const ZooGateway = ({
 				setApiConfigurationField={setApiConfigurationField}
 				defaultModelId={resolvedDefaultModelId}
 				models={zooModels}
+				showAutomaticFetchHint
 				modelIdKey="zooGatewayModelId"
 				serviceName="Zoo Gateway"
 				serviceUrl={`${resolvedDashboardBase}/dashboard/models`}

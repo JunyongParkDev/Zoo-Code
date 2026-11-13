@@ -48,6 +48,12 @@ export const OpenAICompatible = ({
 }: OpenAICompatibleProps) => {
 	const { t } = useAppTranslation()
 	const isAzureOpenAi = isAzureOpenAiBaseUrl(apiConfiguration.openAiBaseUrl, apiConfiguration.openAiUseAzure)
+	const configuredBaseUrl = apiConfiguration.openAiBaseUrl?.trim() ?? ""
+	const modelServiceUrl = URL.canParse(configuredBaseUrl) ? new URL(configuredBaseUrl) : undefined
+	const modelServiceOrigin =
+		modelServiceUrl && (modelServiceUrl.protocol === "http:" || modelServiceUrl.protocol === "https:")
+			? modelServiceUrl.origin
+			: undefined
 
 	const [azureApiVersionSelected, setAzureApiVersionSelected] = useState(!!apiConfiguration.azureApiVersion)
 
@@ -160,8 +166,9 @@ export const OpenAICompatible = ({
 				models={openAiModels}
 				modelIdKey="openAiModelId"
 				label={isAzureOpenAi ? t("settings:providers.azureOpenAiDeploymentName") : undefined}
-				serviceName="OpenAI"
-				serviceUrl="https://platform.openai.com"
+				serviceName={isAzureOpenAi ? "Azure OpenAI" : "OpenAI Compatible"}
+				serviceUrl={modelServiceOrigin ?? ""}
+				showAutomaticFetchHint={!!modelServiceOrigin && !!apiConfiguration.openAiApiKey}
 				organizationAllowList={organizationAllowList}
 				errorMessage={modelValidationError}
 				simplifySettings={simplifySettings}

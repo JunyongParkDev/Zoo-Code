@@ -155,6 +155,55 @@ describe("OpenAICompatible Component - includeMaxTokens checkbox", () => {
 		})
 	})
 
+	describe("automatic-fetch hint", () => {
+		it.each([
+			{
+				name: "HTTPS endpoint",
+				url: "https://models.example.com/v1",
+				key: "key",
+				expectedUrl: "https://models.example.com",
+				visible: true,
+			},
+			{
+				name: "local HTTP endpoint",
+				url: "http://localhost:4000/v1",
+				key: "key",
+				expectedUrl: "http://localhost:4000",
+				visible: true,
+			},
+			{
+				name: "URL credentials and request data",
+				url: " https://user:pass@custom.test/v1?token=secret#fragment ",
+				key: "key",
+				expectedUrl: "https://custom.test",
+				visible: true,
+			},
+			{ name: "missing endpoint", url: undefined, key: "key", expectedUrl: "", visible: false },
+			{ name: "invalid endpoint", url: "not a URL", key: "key", expectedUrl: "", visible: false },
+			{ name: "file endpoint", url: "file:///tmp/models", key: "key", expectedUrl: "", visible: false },
+			{ name: "JavaScript endpoint", url: "javascript:alert(1)", key: "key", expectedUrl: "", visible: false },
+			{
+				name: "missing API key",
+				url: "https://models.example.com/v1",
+				key: undefined,
+				expectedUrl: "https://models.example.com",
+				visible: false,
+			},
+		])("uses a safe provider origin for $name", ({ url, key, expectedUrl, visible }) => {
+			render(
+				<OpenAICompatible
+					apiConfiguration={{ openAiBaseUrl: url, openAiApiKey: key }}
+					setApiConfigurationField={mockSetApiConfigurationField}
+					organizationAllowList={mockOrganizationAllowList}
+				/>,
+			)
+
+			expect(mockModelPicker).toHaveBeenLastCalledWith(
+				expect.objectContaining({ serviceUrl: expectedUrl, showAutomaticFetchHint: visible }),
+			)
+		})
+	})
+
 	describe("Azure OpenAI guidance", () => {
 		it.each([
 			{ openAiBaseUrl: "https://resource.openai.azure.com/" },

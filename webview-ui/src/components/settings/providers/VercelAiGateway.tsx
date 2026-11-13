@@ -71,6 +71,7 @@ export const VercelAiGateway = ({
 				setApiConfigurationField={setApiConfigurationField}
 				defaultModelId={vercelAiGatewayDefaultModelId}
 				models={routerModels?.[providerIdentifiers.vercelAiGateway] ?? {}}
+				showAutomaticFetchHint
 				modelIdKey="vercelAiGatewayModelId"
 				serviceName="Vercel AI Gateway"
 				serviceUrl="https://vercel.com/ai-gateway/models"

@@ -71,6 +71,7 @@ export const Kenari = ({
 				setApiConfigurationField={setApiConfigurationField}
 				defaultModelId={kenariDefaultModelId}
 				models={routerModels?.[providerIdentifiers.kenari] ?? {}}
+				showAutomaticFetchHint
 				modelIdKey="kenariModelId"
 				serviceName="Kenari"
 				serviceUrl="https://kenari.id/docs"

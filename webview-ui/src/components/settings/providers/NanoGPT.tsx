@@ -96,6 +96,7 @@ export const NanoGPT = ({
 				setApiConfigurationField={setApiConfigurationField}
 				defaultModelId={nanoGptDefaultModelId}
 				models={routerModels?.[providerIdentifiers.nanogpt] ?? {}}
+				showAutomaticFetchHint
 				modelIdKey="nanoGptModelId"
 				serviceName={t("settings:providers.nanoGpt.provider")}
 				serviceUrl="https://nano-gpt.com/api"

@@ -2,7 +2,9 @@ import { act, fireEvent, render, screen, within } from "@/utils/test-utils"
 import {
 	bedrockDefaultModelId,
 	DEFAULT_CONSECUTIVE_MISTAKE_LIMIT,
+	friendliModels,
 	providerIdentifiers,
+	sambaNovaModels,
 	type ProviderSettings,
 } from "@roo-code/types"
 import type { ChangeEventHandler, ComponentProps, InputHTMLAttributes, ReactNode } from "react"
@@ -537,16 +539,52 @@ describe("ApiOptions interactions", () => {
 		expect(setApiConfigurationField).toHaveBeenCalledWith("awsCustomArn", arn)
 	})
 
-	it("passes the fetched Friendli catalog to the settings model picker", () => {
+	describe("model catalog source", () => {
 		const fetched = { "vendor/fetched-only": { contextWindow: 1000, supportsPromptCache: false } }
-		useRouterModelsMock.mockImplementation(() => ({ data: { friendli: fetched }, refetch: vi.fn() }))
 
-		renderApiOptions({
-			apiConfiguration: { apiProvider: providerIdentifiers.friendli, apiModelId: "vendor/fetched-only" },
+		it.each([
+			{
+				name: "fetched Friendli catalog",
+				provider: providerIdentifiers.friendli,
+				routerModels: { friendli: fetched },
+				expectedModels: fetched,
+				expectedHint: true,
+			},
+			{
+				name: "empty Friendli catalog",
+				provider: providerIdentifiers.friendli,
+				routerModels: { friendli: {} },
+				expectedModels: friendliModels,
+				expectedHint: false,
+			},
+			{
+				name: "missing Friendli catalog",
+				provider: providerIdentifiers.friendli,
+				routerModels: {},
+				expectedModels: friendliModels,
+				expectedHint: false,
+			},
+			{
+				name: "static catalog with unrelated fetched models",
+				provider: providerIdentifiers.sambanova,
+				routerModels: { friendli: fetched },
+				expectedModels: sambaNovaModels,
+				expectedHint: false,
+			},
+		])("uses the correct hint for the $name", ({ provider, routerModels, expectedModels, expectedHint }) => {
+			useRouterModelsMock.mockImplementation(() => ({ data: routerModels, refetch: vi.fn() }))
+
+			renderApiOptions({ apiConfiguration: { apiProvider: provider, apiModelId: "vendor/fetched-only" } })
+
+			if (provider === providerIdentifiers.friendli) {
+				expect(useRouterModelsMock).toHaveBeenCalledWith({
+					enabled: true,
+					provider: providerIdentifiers.friendli,
+				})
+			}
+			expect(modelPickerMock.mock.lastCall?.[0].models).toBe(expectedModels)
+			expect(modelPickerMock.mock.lastCall?.[0].showAutomaticFetchHint).toBe(expectedHint)
 		})
-
-		expect(useRouterModelsMock).toHaveBeenCalledWith({ enabled: true, provider: providerIdentifiers.friendli })
-		expect(modelPickerMock.mock.lastCall?.[0].models).toBe(fetched)
 	})
 
 	it("does not transform model IDs for non-Bedrock providers", () => {

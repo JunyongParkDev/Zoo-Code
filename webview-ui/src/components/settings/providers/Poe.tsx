@@ -165,6 +165,7 @@ export const Poe = ({
 				setApiConfigurationField={setApiConfigurationField}
 				defaultModelId={poeDefaultModelId}
 				models={routerModels?.poe ?? {}}
+				showAutomaticFetchHint
 				modelIdKey="apiModelId"
 				serviceName="Poe"
 				serviceUrl="https://poe.com"

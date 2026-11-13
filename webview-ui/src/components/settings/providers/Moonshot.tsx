@@ -154,6 +154,7 @@ export const Moonshot = ({ apiConfiguration, setApiConfigurationField, simplifyS
 				setApiConfigurationField={setApiConfigurationField}
 				defaultModelId={moonshotDefaultModelId}
 				models={routerModels?.moonshot ?? {}}
+				showAutomaticFetchHint
 				modelIdKey="apiModelId"
 				serviceName="Moonshot"
 				serviceUrl="https://platform.moonshot.ai"
