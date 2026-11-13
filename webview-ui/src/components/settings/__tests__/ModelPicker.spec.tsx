@@ -292,7 +292,7 @@ describe("ModelPicker", () => {
 			expect(screen.queryByTestId("automatic-fetch-hint")).not.toBeInTheDocument()
 		})
 
-		it("shows automatic-fetch guidance and the service link for an opted-in provider", async () => {
+		it("keeps automatic-fetch guidance and the service link without model or free-model recommendations", async () => {
 			await act(async () => {
 				renderWithExtensionState(
 					<ModelPicker
@@ -311,6 +311,29 @@ describe("ModelPicker", () => {
 			expect(within(hint).getByRole("link", { name: defaultProps.serviceName })).toHaveAttribute(
 				"href",
 				defaultProps.serviceUrl,
+			)
+			// Recommendation links can have an onClick without an href, so include every anchor.
+			expect(hint.querySelectorAll("a")).toHaveLength(1)
+			expect(hint).not.toHaveTextContent(defaultProps.defaultModelId)
+			expect(hint).not.toHaveTextContent(/works best with|free|no-cost/i)
+		})
+
+		it("still initializes an unset model from the provider default without marking a user edit", async () => {
+			await act(async () => {
+				renderWithExtensionState(
+					<ModelPicker
+						{...defaultProps}
+						apiConfiguration={{ apiProvider: providerIdentifiers.openai }}
+						modelIdKey="openAiModelId"
+					/>,
+					{ queryClient },
+				)
+			})
+
+			expect(mockSetApiConfigurationField).toHaveBeenCalledWith(
+				"openAiModelId",
+				defaultProps.defaultModelId,
+				false,
 			)
 		})
 	})
