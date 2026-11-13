@@ -1,6 +1,6 @@
 // npx vitest src/components/settings/__tests__/ModelPicker.spec.tsx
 
-import { screen, fireEvent, renderWithExtensionState } from "@/utils/test-utils"
+import { screen, fireEvent, renderWithExtensionState, within } from "@/utils/test-utils"
 import { act, type ReactNode } from "react"
 import { QueryClient } from "@tanstack/react-query"
 import { type Mock } from "vitest"
@@ -22,6 +22,7 @@ import {
 	toBedrockModelId,
 } from "../utils/providerModelConfig"
 import { useRouterModels } from "@src/components/ui/hooks/useRouterModels"
+import TranslationProvider from "@src/i18n/TranslationContext"
 
 type SetApiConfigurationField = <K extends keyof ProviderSettings>(
 	field: K,
@@ -34,8 +35,10 @@ const createRouterModelsResult = (data: Partial<RouterModels>): ReturnType<typeo
 	({ data, isLoading: false, isError: false }) as ReturnType<typeof useRouterModels>
 
 vi.mock("@src/context/ExtensionStateContext", () => ({
-	ExtensionStateContextProvider: ({ children }: { children: ReactNode }) => children,
-	useExtensionState: vi.fn(),
+	ExtensionStateContextProvider: ({ children }: { children: ReactNode }) => (
+		<TranslationProvider>{children}</TranslationProvider>
+	),
+	useExtensionState: vi.fn(() => ({ language: "en" })),
 }))
 
 vi.mock("@src/components/ui/hooks/useRouterModels")
@@ -264,18 +267,7 @@ describe("ModelPicker", () => {
 	})
 
 	describe("automaticFetch hint", () => {
-		it("hides the automatic fetch hint for MiMo provider", async () => {
-			await act(async () => {
-				renderWithExtensionState(
-					<ModelPicker {...defaultProps} apiConfiguration={{ apiProvider: providerIdentifiers.mimo }} />,
-					{ queryClient },
-				)
-			})
-
-			expect(screen.queryByTestId("automatic-fetch-hint")).not.toBeInTheDocument()
-		})
-
-		it("shows the automatic fetch hint for non-MiMo providers", async () => {
+		it("hides the automatic fetch hint unless the provider opts in", async () => {
 			await act(async () => {
 				renderWithExtensionState(
 					<ModelPicker {...defaultProps} apiConfiguration={{ apiProvider: providerIdentifiers.openai }} />,
@@ -283,7 +275,43 @@ describe("ModelPicker", () => {
 				)
 			})
 
-			expect(screen.getByTestId("automatic-fetch-hint")).toBeInTheDocument()
+			expect(screen.queryByTestId("automatic-fetch-hint")).not.toBeInTheDocument()
+		})
+
+		it.each([
+			{ name: "MiMo", props: { apiConfiguration: { apiProvider: providerIdentifiers.mimo } } },
+			{ name: "hidden pricing", props: { hidePricing: true } },
+			{ name: "simplified settings", props: { simplifySettings: true } },
+		])("hides the opted-in automatic fetch hint for $name", async ({ props }) => {
+			await act(async () => {
+				renderWithExtensionState(<ModelPicker {...defaultProps} showAutomaticFetchHint {...props} />, {
+					queryClient,
+				})
+			})
+
+			expect(screen.queryByTestId("automatic-fetch-hint")).not.toBeInTheDocument()
+		})
+
+		it("shows automatic-fetch guidance and the service link for an opted-in provider", async () => {
+			await act(async () => {
+				renderWithExtensionState(
+					<ModelPicker
+						{...defaultProps}
+						apiConfiguration={{ apiProvider: providerIdentifiers.openai }}
+						showAutomaticFetchHint
+					/>,
+					{ queryClient },
+				)
+			})
+
+			const hint = screen.getByTestId("automatic-fetch-hint")
+			expect(hint).toHaveTextContent(
+				"The extension automatically fetches the latest list of models available on Test Service.",
+			)
+			expect(within(hint).getByRole("link", { name: defaultProps.serviceName })).toHaveAttribute(
+				"href",
+				defaultProps.serviceUrl,
+			)
 		})
 	})
 

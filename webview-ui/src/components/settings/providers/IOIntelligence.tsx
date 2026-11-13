@@ -89,6 +89,7 @@ export const IOIntelligence = ({
 				setApiConfigurationField={setApiConfigurationField}
 				defaultModelId={ioIntelligenceDefaultModelId}
 				models={routerModels?.[providerIdentifiers.ioIntelligence] ?? {}}
+				showAutomaticFetchHint
 				modelIdKey="ioIntelligenceModelId"
 				serviceName={t("settings:providers.ioIntelligence.provider")}
 				serviceUrl="https://io.net/intelligence"

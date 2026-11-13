@@ -68,6 +68,8 @@ interface ModelPickerProps {
 	errorMessage?: string
 	simplifySettings?: boolean
 	hidePricing?: boolean
+	/** Opt in only when the model catalog is automatically fetched instead of bundled. */
+	showAutomaticFetchHint?: boolean
 	/** Label for the model picker field - defaults to "Model" */
 	label?: string
 	/** Transform model ID string to the value stored in configuration (for compound types like VSCodeLM selector) */
@@ -90,6 +92,7 @@ export const ModelPicker = ({
 	errorMessage,
 	simplifySettings,
 	hidePricing,
+	showAutomaticFetchHint = false,
 	label,
 	valueTransform,
 	displayTransform,
@@ -216,6 +219,9 @@ export const ModelPicker = ({
 	// Use the shared ESC key handler hook
 	useEscapeKey(open, () => setOpen(false))
 
+	const shouldShowAutomaticFetchHint =
+		showAutomaticFetchHint && !hidePricing && apiConfiguration.apiProvider !== providerIdentifiers.mimo
+
 	return (
 		<>
 			<div>
@@ -313,7 +319,7 @@ export const ModelPicker = ({
 							hidePricing={hidePricing}
 						/>
 					)}
-					{!hidePricing && apiConfiguration.apiProvider !== providerIdentifiers.mimo && (
+					{shouldShowAutomaticFetchHint && (
 						<div className="text-sm text-vscode-descriptionForeground" data-testid="automatic-fetch-hint">
 							<Trans
 								i18nKey="settings:modelPicker.automaticFetch"

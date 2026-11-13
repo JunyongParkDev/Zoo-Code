@@ -94,6 +94,7 @@ export const Unbound = ({
 				setApiConfigurationField={setApiConfigurationField}
 				defaultModelId={unboundDefaultModelId}
 				models={routerModels?.unbound ?? {}}
+				showAutomaticFetchHint
 				modelIdKey="unboundModelId"
 				serviceName="Unbound"
 				serviceUrl="https://api.getunbound.ai/models"

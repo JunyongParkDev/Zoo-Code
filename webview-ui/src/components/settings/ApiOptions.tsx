@@ -785,6 +785,10 @@ const ApiOptions = ({
 									apiConfiguration,
 									routerModels,
 								)}
+								showAutomaticFetchHint={
+									activeSelectedProvider === providerIdentifiers.friendli &&
+									Object.keys(routerModels?.friendli ?? {}).length > 0
+								}
 								modelIdKey="apiModelId"
 								serviceName={getProviderServiceConfig(activeSelectedProvider).serviceName}
 								serviceUrl={getProviderServiceConfig(activeSelectedProvider).serviceUrl}

@@ -150,6 +150,7 @@ export const OpenCodeGo = ({
 				setApiConfigurationField={setApiConfigurationField}
 				defaultModelId={opencodeGoDefaultModelId}
 				models={routerModels?.[providerIdentifiers.opencodeGo] ?? {}}
+				showAutomaticFetchHint
 				modelIdKey="opencodeGoModelId"
 				serviceName="Opencode Go"
 				serviceUrl="https://opencode.ai/docs/go/"

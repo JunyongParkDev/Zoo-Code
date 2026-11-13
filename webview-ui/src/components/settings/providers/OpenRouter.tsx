@@ -108,6 +108,7 @@ export const OpenRouter = ({
 				setApiConfigurationField={setApiConfigurationField}
 				defaultModelId={openRouterDefaultModelId}
 				models={routerModels?.openrouter ?? {}}
+				showAutomaticFetchHint
 				modelIdKey="openRouterModelId"
 				serviceName="OpenRouter"
 				serviceUrl="https://openrouter.ai/models"

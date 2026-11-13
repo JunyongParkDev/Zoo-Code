@@ -177,6 +177,7 @@ export const LiteLLM = ({
 				apiConfiguration={apiConfiguration}
 				defaultModelId={litellmDefaultModelId}
 				models={routerModels?.litellm ?? {}}
+				showAutomaticFetchHint
 				modelIdKey="litellmModelId"
 				serviceName="LiteLLM"
 				serviceUrl="https://docs.litellm.ai/"

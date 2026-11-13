@@ -146,6 +146,7 @@ export const Requesty = ({
 				setApiConfigurationField={setApiConfigurationField}
 				defaultModelId={requestyDefaultModelId}
 				models={routerModels?.requesty ?? {}}
+				showAutomaticFetchHint
 				modelIdKey="requestyModelId"
 				serviceName="Requesty"
 				serviceUrl="https://requesty.ai"
